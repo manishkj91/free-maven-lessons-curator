@@ -1,6 +1,30 @@
 // Global state
 let lessons = [];
 let activeQuery = '';
+let activeTag = ''; // Filter by tag (e.g. 'AI', 'Product')
+
+// Category tags mapping keywords (case-insensitive)
+const CATEGORY_KEYWORDS = {
+  'AI': ['ai', 'agent', 'llm', 'gpt', 'claude', 'prompt', 'rag', 'neural', 'copilot', 'v0', 'evals', 'openclaw', 'learning loops', 'gemini', 'anthropic', 'openai'],
+  'Product': ['pm', 'product', 'roadmapping', 'discovery', 'user research', 'product manager', 'strategy', 'metrics', 'roadmap', 'framework', 'agile', 'scrum', 'persona'],
+  'Engineering': ['engineer', 'code', 'coding', 'python', 'javascript', 'developer', 'system design', 'scaling', 'architecture', 'git', 'sql', 'database', 'api', 'backend', 'frontend', 'docker', 'webdev'],
+  'Design': ['design', 'portfolio', 'ui', 'ux', 'visual', 'interface', 'figma', 'prototyping', 'prototype', 'usability', 'wireframe'],
+  'Marketing': ['marketing', 'growth', 'conversion', 'sales', 'branding', 'seo', 'acquisition', 'social media', 'copywriting', 'funnel', 'b2b', 'content strategy'],
+  'Leadership': ['leader', 'leadership', 'manage', 'manager', 'managing', 'executive', 'influence', 'career', 'negotiate', 'team', 'okr', 'feedback'],
+  'Founders': ['founder', 'startup', 'mvp', 'venture', 'business', 'saas', 'fundraising', 'pitch', 'y combinator', 'monetization', 'solopreneur']
+};
+
+// CSS class mapping for tags
+const TAG_CLASSES = {
+  'AI': 'tag-ai',
+  'Product': 'tag-product',
+  'Engineering': 'tag-engineering',
+  'Design': 'tag-design',
+  'Marketing': 'tag-marketing',
+  'Leadership': 'tag-leadership',
+  'Founders': 'tag-founders',
+  'General': 'tag-general'
+};
 
 // DOM Elements
 const searchInput = document.getElementById('search-input');
@@ -18,6 +42,7 @@ const syncOverlay = document.getElementById('sync-overlay');
 // Modal Elements
 const detailModal = document.getElementById('detail-modal');
 const modalTitle = document.getElementById('modal-title');
+const modalTags = document.getElementById('modal-tags');
 const modalDate = document.getElementById('modal-date');
 const modalDuration = document.getElementById('modal-duration');
 const modalSignups = document.getElementById('modal-signups');
@@ -40,7 +65,6 @@ function setupEventListeners() {
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
       activeQuery = e.target.value.trim();
-      updatePillsSelection(activeQuery);
       filterAndRender();
     }, 250);
   });
@@ -48,22 +72,6 @@ function setupEventListeners() {
   // Sort and Category Filters
   sortSelect.addEventListener('change', filterAndRender);
   categorySelect.addEventListener('change', filterAndRender);
-
-  // Category Pills
-  pillsContainer.addEventListener('click', (e) => {
-    const pill = e.target.closest('.pill');
-    if (!pill) return;
-
-    // Set active class
-    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-    pill.classList.add('active');
-
-    // Update search input and filter
-    const query = pill.getAttribute('data-query');
-    searchInput.value = query;
-    activeQuery = query;
-    filterAndRender();
-  });
 
   // Sync Database Button
   syncBtn.addEventListener('click', syncDatabase);
@@ -78,18 +86,6 @@ function setupEventListeners() {
   });
 }
 
-// Update pills active states when manual typing
-function updatePillsSelection(query) {
-  document.querySelectorAll('.pill').forEach(pill => {
-    const dataQuery = pill.getAttribute('data-query');
-    if (dataQuery.toLowerCase() === query.toLowerCase()) {
-      pill.classList.add('active');
-    } else {
-      pill.classList.remove('active');
-    }
-  });
-}
-
 // Load data from lessons.json
 async function loadData() {
   try {
@@ -97,12 +93,17 @@ async function loadData() {
     if (!response.ok) {
       throw new Error('Database file not found');
     }
-    lessons = await response.json();
+    const rawData = await response.json();
     
-    // Update stats and display date of lessons file if available
-    statsCount.textContent = `Total database: ${lessons.length} lessons loaded`;
+    // Classify all lessons with tags
+    lessons = rawData.map(item => {
+      return {
+        ...item,
+        _tags: getTagsForLesson(item)
+      };
+    });
     
-    // Attempt to read file headers / metadata for last sync time
+    // Update last sync timestamp
     const lastModifiedHeader = response.headers.get('Last-Modified');
     if (lastModifiedHeader) {
       const date = new Date(lastModifiedHeader);
@@ -111,6 +112,8 @@ async function loadData() {
       lastSyncTime.textContent = 'Last Synced: Local File';
     }
     
+    // Render top category pills dynamically with counts
+    renderCategoryPills();
     filterAndRender();
   } catch (error) {
     renderEmptyState(true);
@@ -119,7 +122,6 @@ async function loadData() {
 
 // Trigger Backend Server Update
 async function syncDatabase() {
-  // Disable UI and show overlay
   syncBtn.disabled = true;
   syncBtnText.textContent = 'Syncing...';
   syncIcon.classList.add('spin');
@@ -132,7 +134,6 @@ async function syncDatabase() {
     }
     const result = await response.json();
     if (result.status === 'success') {
-      // Small timeout to show completion before loading fresh JSON
       setTimeout(() => {
         syncOverlay.classList.remove('visible');
         syncBtn.disabled = false;
@@ -148,14 +149,12 @@ async function syncDatabase() {
     syncBtn.disabled = false;
     syncBtnText.textContent = 'Sync Database';
     syncIcon.classList.remove('spin');
-    // TODO(security): Avoid console.error of detailed exception traces, display a clean modal dialog or console trace
     console.warn('Sync failed:', error.message);
     showSyncError();
   }
 }
 
 function showSyncError() {
-  // Clear grid and display error message
   lessonsGrid.replaceChildren();
   const box = document.createElement('div');
   box.className = 'state-message';
@@ -176,6 +175,105 @@ function showSyncError() {
   lessonsGrid.appendChild(box);
 }
 
+// Dynamic Tag Classification Engine
+function getTagsForLesson(item) {
+  const title = item.title.toLowerCase();
+  const tags = [];
+  
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(keyword => title.includes(keyword))) {
+      tags.push(category);
+    }
+  }
+  
+  if (tags.length === 0) {
+    tags.push('General');
+  }
+  return tags;
+}
+
+// Calculate tag stats and render the filter pills
+function renderCategoryPills() {
+  // Count how many items match each tag
+  const tagCounts = {
+    'All': lessons.length
+  };
+  
+  // Initialize counts
+  Object.keys(CATEGORY_KEYWORDS).forEach(tag => {
+    tagCounts[tag] = 0;
+  });
+  tagCounts['General'] = 0;
+  
+  // Count
+  lessons.forEach(item => {
+    item._tags.forEach(tag => {
+      if (tagCounts[tag] !== undefined) {
+        tagCounts[tag]++;
+      }
+    });
+  });
+
+  // Re-build navigation container
+  pillsContainer.replaceChildren();
+
+  // 1. "All Lessons" pill
+  const allPill = document.createElement('button');
+  allPill.className = `pill ${activeTag === '' ? 'active' : ''}`;
+  allPill.setAttribute('data-tag', '');
+  
+  const allLabel = document.createElement('span');
+  allLabel.textContent = 'All Lessons';
+  allPill.appendChild(allLabel);
+  
+  const allCount = document.createElement('span');
+  allCount.className = 'pill-count';
+  allCount.textContent = tagCounts['All'].toLocaleString();
+  allPill.appendChild(allCount);
+
+  allPill.addEventListener('click', () => handleTagClick(''));
+  pillsContainer.appendChild(allPill);
+
+  // 2. Category pills
+  const categoriesList = [...Object.keys(CATEGORY_KEYWORDS), 'General'];
+  categoriesList.forEach(tag => {
+    const count = tagCounts[tag] || 0;
+    if (count === 0) return; // Skip empty tags
+
+    const pill = document.createElement('button');
+    pill.className = `pill ${activeTag === tag ? 'active' : ''}`;
+    pill.setAttribute('data-tag', tag);
+
+    const label = document.createElement('span');
+    label.textContent = tag;
+    pill.appendChild(label);
+
+    const badge = document.createElement('span');
+    badge.className = 'pill-count';
+    badge.textContent = count.toLocaleString();
+    pill.appendChild(badge);
+
+    pill.addEventListener('click', () => handleTagClick(tag));
+    pillsContainer.appendChild(pill);
+  });
+}
+
+function handleTagClick(tag) {
+  activeTag = tag;
+  
+  // Update active pill UI class
+  document.querySelectorAll('#pills-container .pill').forEach(pill => {
+    const pillTag = pill.getAttribute('data-tag');
+    if (pillTag === tag) {
+      pill.classList.add('active');
+    } else {
+      pill.classList.remove('active');
+    }
+  });
+
+  filterAndRender();
+}
+
 // Relevance scoring helper
 function calculateRelevance(item, queryTerms) {
   if (queryTerms.length === 0) return 0;
@@ -183,22 +281,21 @@ function calculateRelevance(item, queryTerms) {
   let score = 0;
   const title = item.title.toLowerCase();
   
-  // Format instructors for checking
   const instructors = (item.instructors || [])
     .map(inst => inst.name.toLowerCase())
     .join(' ');
 
   for (const term of queryTerms) {
-    // Exact word in title (high weight)
+    // Exact word in title
     const titleRegex = new RegExp('\\b' + escapeRegExp(term) + '\\b', 'i');
     if (titleRegex.test(title)) {
       score += 10;
     } else if (title.includes(term)) {
-      // Substring match in title
+      // Substring match
       score += 3;
     }
 
-    // Exact match in instructor name (medium weight)
+    // Exact match in instructor name
     const instRegex = new RegExp('\\b' + escapeRegExp(term) + '\\b', 'i');
     if (instRegex.test(instructors)) {
       score += 5;
@@ -209,7 +306,6 @@ function calculateRelevance(item, queryTerms) {
   return score;
 }
 
-// Regex escape helper
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -225,18 +321,23 @@ function filterAndRender() {
   const selectedType = categorySelect.value;
   const sortBy = sortSelect.value;
 
-  // 1. Filter and compute relevance scores
+  // 1. Map scores
   let filtered = lessons.map(item => {
     const score = calculateRelevance(item, queryTerms);
     return { ...item, _score: score };
   });
 
-  // Filter by query matches (if query exists, only show items with relevance > 0)
+  // Filter by tag if selected
+  if (activeTag !== '') {
+    filtered = filtered.filter(item => item._tags.includes(activeTag));
+  }
+
+  // Filter by text search query matches
   if (queryTerms.length > 0) {
     filtered = filtered.filter(item => item._score > 0);
   }
 
-  // Filter by lesson type
+  // Filter by lesson type selector
   if (selectedType !== 'all') {
     filtered = filtered.filter(item => item.item_type === selectedType);
   }
@@ -247,7 +348,6 @@ function filterAndRender() {
       if (b._score !== a._score) {
         return b._score - a._score;
       }
-      // Tie-breaker: sort by signups
       return b.signup_count - a.signup_count;
     } else if (sortBy === 'popularity') {
       if (b.signup_count !== a.signup_count) {
@@ -257,24 +357,22 @@ function filterAndRender() {
     } else if (sortBy === 'date') {
       const aDate = a.start_datetime ? new Date(a.start_datetime).getTime() : Infinity;
       const bDate = b.start_datetime ? new Date(b.start_datetime).getTime() : Infinity;
-      return aDate - bDate; // Soonest first
+      return aDate - bDate;
     } else if (sortBy === 'duration') {
       return b.duration_minutes - a.duration_minutes;
     }
-    
-    // Default fallback if no search query but sorted by relevance
-    return b.signup_count - a.signup_count;
+    return b.signup_count - a.signup_count; // Popularity fallback
   });
 
   // 3. Render Cards
   renderCards(filtered);
 }
 
-// Render cards strictly using secure DOM methods (no innerHTML)
+// Render cards using secure DOM methods (no innerHTML)
 function renderCards(items) {
   lessonsGrid.replaceChildren();
 
-  // Update stats
+  // Update stats counts
   statsCount.textContent = `Found ${items.length} relevant lessons`;
 
   if (items.length === 0) {
@@ -282,7 +380,7 @@ function renderCards(items) {
     return;
   }
 
-  // Render a max of 200 items in the page grid for performance
+  // Slice to render up to 200 items in the page grid for performance
   const displayItems = items.slice(0, 200);
 
   displayItems.forEach(item => {
@@ -296,13 +394,11 @@ function renderCards(items) {
     const cardBadges = document.createElement('div');
     cardBadges.className = 'card-badges';
 
-    // Signup badge
     const signupBadge = document.createElement('span');
     signupBadge.className = 'badge-signup';
     signupBadge.textContent = `${item.signup_count.toLocaleString()} signups`;
     cardBadges.appendChild(signupBadge);
 
-    // Relevance badge (only if searched)
     if (item._score > 0) {
       const relevanceBadge = document.createElement('span');
       relevanceBadge.className = 'badge-relevance';
@@ -324,6 +420,23 @@ function renderCards(items) {
     authors.textContent = `By ${instructorNames || 'Maven Experts'}`;
     cardTop.appendChild(authors);
     
+    // Classified Card Tags Row
+    const cardTagsRow = document.createElement('div');
+    cardTagsRow.className = 'card-tags';
+    item._tags.forEach(tag => {
+      const tagSpan = document.createElement('span');
+      tagSpan.className = `lesson-tag ${TAG_CLASSES[tag] || 'tag-general'}`;
+      tagSpan.textContent = tag;
+      
+      // Allow filtering by clicking on card tag badges
+      tagSpan.addEventListener('click', (e) => {
+        e.stopPropagation(); // Avoid triggering card details click
+        handleTagClick(tag);
+      });
+      cardTagsRow.appendChild(tagSpan);
+    });
+    cardTop.appendChild(cardTagsRow);
+
     card.appendChild(cardTop);
 
     // Bottom Section
@@ -400,7 +513,6 @@ function renderCards(items) {
   });
 }
 
-// Format Date helper
 function formatDate(dateStr) {
   if (!dateStr) return 'TBA';
   try {
@@ -445,7 +557,7 @@ function renderEmptyState(isMissingDb) {
   const p = document.createElement('p');
   p.textContent = isMissingDb 
     ? 'It seems your local lessons.json file does not exist. Click "Sync Database" to fetch the latest free lessons directly from Maven.com.'
-    : 'No lessons matched your search query. Try broadening your keywords or clicking the tags above.';
+    : 'No lessons matched your search query. Try switching tags or broadening your keywords.';
   box.appendChild(p);
 
   if (isMissingDb) {
@@ -474,6 +586,19 @@ function openModal(item) {
   modalSignups.textContent = `${item.signup_count.toLocaleString()} Signups`;
   modalItemId.textContent = `#${item.item_id}`;
 
+  // Render modal tags
+  modalTags.replaceChildren();
+  item._tags.forEach(tag => {
+    const tagSpan = document.createElement('span');
+    tagSpan.className = `lesson-tag ${TAG_CLASSES[tag] || 'tag-general'}`;
+    tagSpan.textContent = tag;
+    tagSpan.addEventListener('click', () => {
+      closeModal();
+      handleTagClick(tag);
+    });
+    modalTags.appendChild(tagSpan);
+  });
+
   // Instructors
   modalInstructors.replaceChildren();
   (item.instructors || []).forEach(inst => {
@@ -487,7 +612,6 @@ function openModal(item) {
       img.setAttribute('alt', inst.name);
       row.appendChild(img);
     } else {
-      // Placeholder initials box
       const div = document.createElement('div');
       div.className = 'instructor-img';
       div.style.display = 'flex';
@@ -515,15 +639,14 @@ function openModal(item) {
 
   // Show Modal
   detailModal.classList.add('visible');
-  document.body.style.overflow = 'hidden'; // Lock background scroll
+  document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
   detailModal.classList.remove('visible');
-  document.body.style.overflow = ''; // Unlock scroll
+  document.body.style.overflow = '';
 }
 
-// Slugify helper
 function slugify(title) {
   return title
     .toLowerCase()

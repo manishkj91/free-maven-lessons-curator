@@ -1,6 +1,6 @@
-# Free Maven Lessons Curator
+# Maven Lightning Lesson Curator
 
-An interactive, premium single-page web application to discover, search, and rank over 3,400+ free cohort-based lessons from Maven.com in order of relevance.
+An interactive, premium single-page web application to discover, search, and rank over 3,400+ free cohort-based Lightning Lessons from Maven.com, classified by category and ranked by relevance. Fully polished and Product Hunt ready!
 
 ## Tech Stack
 - **Frontend**: Vanilla HTML5, Vanilla CSS3 (with Outfit/Inter Google fonts & dynamic glassmorphism), and Vanilla ES6+ JavaScript.
@@ -10,12 +10,22 @@ An interactive, premium single-page web application to discover, search, and ran
 
 ## Features
 - **Relevance-Based Search**: Matches queries (like "AI agents") against lesson titles and instructor names. Results are scored and ranked in real-time.
+- **Dynamic Tagging Classification**: Automatically parses lesson titles to classify them into relevant categories:
+  - **AI**: Agent, LLM, GPT, Claude, RAG, Evals, etc.
+  - **Product**: PM, discovery, user research, strategy, etc.
+  - **Engineering**: Coding, system design, python, database, api, etc.
+  - **Design**: Figma, UI, UX, prototyping, etc.
+  - **Marketing**: Growth, SEO, branding, acquisition, etc.
+  - **Leadership**: Manage, career, influence, team, etc.
+  - **Founders**: Startup, MVP, SaaS, business, Y Combinator.
+- **Top Tags Stats Navigation**: Shows a premium tabbed filter bar with actual database-wide match counts (e.g. *AI (1,245)*). Clicking a pill filters the grid instantly.
+- **Interactive Card Tags**: Every lesson card showcases its tags. Clicking a tag on any card immediately filters the grid.
 - **Tie-Breaker Popularity Sort**: For identical search relevance scores, lessons are sorted by signup counts (popularity) so the highest-quality cohort lessons rise to the top.
 - **Flexible Sorting**: Sort by Relevance, Most Signups (Popularity), Date (Soonest first), or Duration.
-- **Category Quick-Filter Pills**: One-click pills to search for topics like AI Agents, Claude Code, Product Management, System Design, and Coding.
-- **In-Memory Querying**: The static JSON database of 3,462 lessons is cached on the client, providing sub-millisecond search speeds with zero network latency.
+- **In-Memory Querying**: Sub-millisecond search speeds with zero network latency.
 - **Database Synchronization**: Built-in backend endpoint (`/api/sync`) aggregates all pages of free lessons from `api.maven.com` via server-to-server requests to bypass browser CORS restrictions. Clicking **"Sync Database"** updates the local JSON file.
 - **Details Modal**: Interactive modal showing full details, date/time in UTC, durations, signup counts, instructor avatars, and direct links to lessons.
+- **Product Hunt Integration**: Features a styled Product Hunt launch widget in the header.
 
 ---
 
@@ -44,16 +54,11 @@ To run the application locally, run the following commands in your terminal:
 
 ## Pushing to GitHub
 
-Since programmatically creating a repository on your personal access token returned a permission restriction, you can easily create the repository and push manually:
+To push the latest changes to your repository:
 
-1. Go to [github.com/new](https://github.com/new) and create a public repository named **`free-maven-lessons-curator`** (do not initialize it with a README, gitignore, or license).
-
-2. Link your local repository to GitHub and push your code:
-   ```bash
-   cd /Users/manishkj/.gemini/antigravity/scratch/free-maven-lessons-curator
-   git add .
-   git commit -m "Initial commit: build interactive Free Maven Lessons Curator app"
-   git branch -M main
-   git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/free-maven-lessons-curator.git
-   git push -u origin main
-   ```
+```bash
+cd /Users/manishkj/.gemini/antigravity/scratch/free-maven-lessons-curator
+git add .
+git commit -m "Polished Maven Lightning Lesson Curator app for Product Hunt"
+git push origin main
+```
