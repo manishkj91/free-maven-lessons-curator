@@ -178,6 +178,18 @@ header {
 }
 
 @media (max-width: 768px) {
+  .logo-area {
+    flex-direction: column;
+    gap: 1.25rem;
+    align-items: center;
+    margin-bottom: 2.5rem;
+  }
+  .header-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+  }
   .search-bar-row {
     grid-template-columns: 1fr;
   }
