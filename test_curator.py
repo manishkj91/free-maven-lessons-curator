@@ -4,26 +4,43 @@ import os
 import json
 from scrape_free_lessons import slugify
 
-# Dynamic Tag Classification keywords matching the JS app.js logic
+# Updated Tag Priority Order: AI > Product > Design > Engineering > Marketing > Founders > Leadership
+TAG_PRIORITY = ['AI', 'Product', 'Design', 'Engineering', 'Marketing', 'Founders', 'Leadership']
+
 CATEGORY_KEYWORDS = {
   'AI': ['ai', 'agent', 'llm', 'gpt', 'claude', 'prompt', 'rag', 'neural', 'copilot', 'v0', 'evals', 'openclaw', 'learning loops', 'gemini', 'anthropic', 'openai'],
-  'Product': ['pm', 'product', 'roadmapping', 'discovery', 'user research', 'product manager', 'strategy', 'metrics', 'roadmap', 'framework', 'agile', 'scrum', 'persona'],
-  'Engineering': ['engineer', 'code', 'coding', 'python', 'javascript', 'developer', 'system design', 'scaling', 'architecture', 'git', 'sql', 'database', 'api', 'backend', 'frontend', 'docker', 'webdev'],
+  'Product': ['pm', 'pms', 'product', 'products', 'roadmapping', 'discovery', 'user research', 'product manager', 'strategy', 'metrics', 'roadmap', 'framework', 'agile', 'scrum', 'persona'],
   'Design': ['design', 'portfolio', 'ui', 'ux', 'visual', 'interface', 'figma', 'prototyping', 'prototype', 'usability', 'wireframe'],
+  'Engineering': ['engineer', 'code', 'coding', 'python', 'javascript', 'developer', 'system design', 'scaling', 'architecture', 'git', 'sql', 'database', 'api', 'backend', 'frontend', 'docker', 'webdev'],
   'Marketing': ['marketing', 'growth', 'conversion', 'sales', 'branding', 'seo', 'acquisition', 'social media', 'copywriting', 'funnel', 'b2b', 'content strategy'],
-  'Leadership': ['leader', 'leadership', 'manage', 'manager', 'managing', 'executive', 'influence', 'career', 'negotiate', 'team', 'okr', 'feedback'],
-  'Founders': ['founder', 'startup', 'mvp', 'venture', 'business', 'saas', 'fundraising', 'pitch', 'y combinator', 'monetization', 'solopreneur']
+  'Founders': ['founder', 'startup', 'mvp', 'venture', 'business', 'saas', 'fundraising', 'pitch', 'y combinator', 'monetization', 'solopreneur'],
+  'Leadership': ['leader', 'leadership', 'manage', 'manager', 'managing', 'executive', 'influence', 'career', 'negotiate', 'team', 'okr', 'feedback']
 }
 
 def get_tags_for_lesson(title):
     title_lower = title.lower()
-    tags = []
+    matched_tags = []
+    
     for category, keywords in CATEGORY_KEYWORDS.items():
-        if any(keyword in title_lower for keyword in keywords):
-            tags.push(category) if hasattr(tags, 'push') else tags.append(category)
-    if not tags:
-        tags.append('General')
-    return tags
+        for keyword in keywords:
+            # Escape regex characters
+            escaped_keyword = re.escape(keyword)
+            # Use word boundaries to prevent substring matching
+            # Support optional trailing 's' for plurals (e.g. pm -> pms, product -> products)
+            pattern = rf"\b{escaped_keyword}s?\b"
+            if re.search(pattern, title_lower):
+                matched_tags.append(category)
+                break
+                
+    # Sort by priority
+    matched_tags.sort(key=lambda t: TAG_PRIORITY.index(t) if t in TAG_PRIORITY else 999)
+    
+    # Take max 2 tags
+    final_tags = matched_tags[:2]
+    if not final_tags:
+        final_tags = ['General']
+        
+    return final_tags
 
 class TestMavenCurator(unittest.TestCase):
     
@@ -38,16 +55,15 @@ class TestMavenCurator(unittest.TestCase):
         """Test that the keyword-based classification tagging works correctly"""
         # Test AI & Product Match
         tags1 = get_tags_for_lesson("OpenClaw Masterclass for PMs")
-        self.assertIn("AI", tags1)
-        self.assertIn("Product", tags1)
+        self.assertEqual(tags1, ["AI", "Product"])
         
-        # Test Engineering Match
-        tags2 = get_tags_for_lesson("System Design and Python Coding for Developers")
-        self.assertIn("Engineering", tags2)
+        # Test Product & Engineering Match
+        tags2 = get_tags_for_lesson("Build Products Like a Forward Deployed Engineer")
+        self.assertEqual(tags2, ["Product", "Engineering"])
         
-        # Test Design Match
-        tags3 = get_tags_for_lesson("How to build a beautiful Figma UI Portfolio")
-        self.assertIn("Design", tags3)
+        # Test AI & Product Match (Design is dropped due to max 2 limit and priority)
+        tags3 = get_tags_for_lesson("Prototype to Production with v0 for PMs")
+        self.assertEqual(tags3, ["AI", "Product"])
         
         # Test General Fallback
         tags4 = get_tags_for_lesson("Creative writing 101")
@@ -64,12 +80,13 @@ class TestMavenCurator(unittest.TestCase):
         self.assertIsInstance(data, list)
         self.assertGreater(len(data), 0)
         
-        # Verify structure of first item
-        first_item = data[0]
-        self.assertIn("title", first_item)
-        self.assertIn("slug", first_item)
-        self.assertIn("instructors", first_item)
-        self.assertIn("signup_count", first_item)
+        # Verify structure of all items
+        for item in data:
+            self.assertIn("title", item)
+            self.assertIn("slug", item)
+            self.assertIn("instructors", item)
+            self.assertIn("signup_count", item)
+            self.assertIn("tags", item, f"Lesson '{item.get('title')}' is missing tags field")
 
 if __name__ == "__main__":
     unittest.main()

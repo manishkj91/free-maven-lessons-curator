@@ -3,16 +3,6 @@ let lessons = [];
 let activeQuery = '';
 let activeTag = ''; // Filter by tag (e.g. 'AI', 'Product')
 
-// Category tags mapping keywords (case-insensitive)
-const CATEGORY_KEYWORDS = {
-  'AI': ['ai', 'agent', 'llm', 'gpt', 'claude', 'prompt', 'rag', 'neural', 'copilot', 'v0', 'evals', 'openclaw', 'learning loops', 'gemini', 'anthropic', 'openai'],
-  'Product': ['pm', 'product', 'roadmapping', 'discovery', 'user research', 'product manager', 'strategy', 'metrics', 'roadmap', 'framework', 'agile', 'scrum', 'persona'],
-  'Engineering': ['engineer', 'code', 'coding', 'python', 'javascript', 'developer', 'system design', 'scaling', 'architecture', 'git', 'sql', 'database', 'api', 'backend', 'frontend', 'docker', 'webdev'],
-  'Design': ['design', 'portfolio', 'ui', 'ux', 'visual', 'interface', 'figma', 'prototyping', 'prototype', 'usability', 'wireframe'],
-  'Marketing': ['marketing', 'growth', 'conversion', 'sales', 'branding', 'seo', 'acquisition', 'social media', 'copywriting', 'funnel', 'b2b', 'content strategy'],
-  'Leadership': ['leader', 'leadership', 'manage', 'manager', 'managing', 'executive', 'influence', 'career', 'negotiate', 'team', 'okr', 'feedback'],
-  'Founders': ['founder', 'startup', 'mvp', 'venture', 'business', 'saas', 'fundraising', 'pitch', 'y combinator', 'monetization', 'solopreneur']
-};
 
 // CSS class mapping for tags
 const TAG_CLASSES = {
@@ -101,11 +91,11 @@ async function loadData() {
     }
     const rawData = await response.json();
     
-    // Classify all lessons with tags
+    // Use pre-classified tags from the dataset
     lessons = rawData.map(item => {
       return {
         ...item,
-        _tags: getTagsForLesson(item)
+        _tags: item.tags || ['General']
       };
     });
     
@@ -181,22 +171,6 @@ function showSyncError() {
   lessonsGrid.appendChild(box);
 }
 
-// Dynamic Tag Classification Engine
-function getTagsForLesson(item) {
-  const title = item.title.toLowerCase();
-  const tags = [];
-  
-  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some(keyword => title.includes(keyword))) {
-      tags.push(category);
-    }
-  }
-  
-  if (tags.length === 0) {
-    tags.push('General');
-  }
-  return tags;
-}
 
 // Calculate tag stats and render the filter pills
 function renderCategoryPills() {
@@ -205,11 +179,10 @@ function renderCategoryPills() {
     'All': lessons.length
   };
   
-  // Initialize counts
-  Object.keys(CATEGORY_KEYWORDS).forEach(tag => {
+  // Initialize counts using TAG_CLASSES keys
+  Object.keys(TAG_CLASSES).forEach(tag => {
     tagCounts[tag] = 0;
   });
-  tagCounts['General'] = 0;
   
   // Count
   lessons.forEach(item => {
@@ -241,7 +214,7 @@ function renderCategoryPills() {
   pillsContainer.appendChild(allPill);
 
   // 2. Category pills
-  const categoriesList = [...Object.keys(CATEGORY_KEYWORDS), 'General'];
+  const categoriesList = Object.keys(TAG_CLASSES);
   categoriesList.forEach(tag => {
     const count = tagCounts[tag] || 0;
     if (count === 0) return; // Skip empty tags

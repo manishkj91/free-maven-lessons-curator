@@ -12,6 +12,44 @@ def slugify(title):
     title = re.sub(r'(^-|-$)+', '', title)
     return title
 
+# Updated Tag Priority Order: AI > Product > Design > Engineering > Marketing > Founders > Leadership
+TAG_PRIORITY = ['AI', 'Product', 'Design', 'Engineering', 'Marketing', 'Founders', 'Leadership']
+
+CATEGORY_KEYWORDS = {
+  'AI': ['ai', 'agent', 'llm', 'gpt', 'claude', 'prompt', 'rag', 'neural', 'copilot', 'v0', 'evals', 'openclaw', 'learning loops', 'gemini', 'anthropic', 'openai'],
+  'Product': ['pm', 'pms', 'product', 'products', 'roadmapping', 'discovery', 'user research', 'product manager', 'strategy', 'metrics', 'roadmap', 'framework', 'agile', 'scrum', 'persona'],
+  'Design': ['design', 'portfolio', 'ui', 'ux', 'visual', 'interface', 'figma', 'prototyping', 'prototype', 'usability', 'wireframe'],
+  'Engineering': ['engineer', 'code', 'coding', 'python', 'javascript', 'developer', 'system design', 'scaling', 'architecture', 'git', 'sql', 'database', 'api', 'backend', 'frontend', 'docker', 'webdev'],
+  'Marketing': ['marketing', 'growth', 'conversion', 'sales', 'branding', 'seo', 'acquisition', 'social media', 'copywriting', 'funnel', 'b2b', 'content strategy'],
+  'Founders': ['founder', 'startup', 'mvp', 'venture', 'business', 'saas', 'fundraising', 'pitch', 'y combinator', 'monetization', 'solopreneur'],
+  'Leadership': ['leader', 'leadership', 'manage', 'manager', 'managing', 'executive', 'influence', 'career', 'negotiate', 'team', 'okr', 'feedback']
+}
+
+def get_tags_for_lesson(title):
+    title_lower = title.lower()
+    matched_tags = []
+    
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        for keyword in keywords:
+            # Escape regex characters
+            escaped_keyword = re.escape(keyword)
+            # Use word boundaries to prevent substring matching
+            # Support optional trailing 's' for plurals (e.g. pm -> pms, product -> products)
+            pattern = rf"\b{escaped_keyword}s?\b"
+            if re.search(pattern, title_lower):
+                matched_tags.append(category)
+                break
+                
+    # Sort by priority
+    matched_tags.sort(key=lambda t: TAG_PRIORITY.index(t) if t in TAG_PRIORITY else 999)
+    
+    # Take max 2 tags
+    final_tags = matched_tags[:2]
+    if not final_tags:
+        final_tags = ['General']
+        
+    return final_tags
+
 def fetch_page(page, limit=1000):
     url = f"https://api.maven.com/free_lessons/discoverable?limit={limit}&page={page}"
     print(f"Fetching page {page} (limit {limit})...")
@@ -65,7 +103,8 @@ def main():
         "Signup Count", 
         "Start Date (UTC)", 
         "Duration (Minutes)", 
-        "Item ID"
+        "Item ID",
+        "Tags"
     ]
     
     with open(csv_file, mode="w", encoding="utf-8", newline="") as f:
@@ -98,6 +137,10 @@ def main():
             duration = item.get("duration_minutes", 0)
             item_id = item.get("item_id", "")
             
+            # Compute tags using title
+            tags = get_tags_for_lesson(title)
+            tags_str = ", ".join(tags)
+            
             writer.writerow([
                 title,
                 instructor_names,
@@ -105,10 +148,12 @@ def main():
                 signup_count,
                 formatted_date,
                 duration,
-                item_id
+                item_id,
+                tags_str
             ])
             
     print(f"Successfully exported {len(all_items)} records to {csv_file}")
 
 if __name__ == "__main__":
     main()
+
