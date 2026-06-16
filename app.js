@@ -53,6 +53,12 @@ const modalClose = document.getElementById('modal-close');
 
 // Initial Load
 window.addEventListener('DOMContentLoaded', () => {
+  // Hide sync button if not running locally
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!isLocal) {
+    syncBtn.style.display = 'none';
+  }
+  
   loadData();
   setupEventListeners();
 });
