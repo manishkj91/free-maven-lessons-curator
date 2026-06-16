@@ -18,6 +18,10 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         # TODO(security): Enforce secure HTTP headers to prevent XSS and Clickjacking
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
+        # Disable caching for static files during development to prevent loading stale code
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         # Allow fonts from googleapi and images from secure cloudfront/maven CDN
         self.send_header(
             "Content-Security-Policy",
