@@ -20,6 +20,7 @@ const TAG_CLASSES = {
 const searchInput = document.getElementById('search-input');
 const sortSelect = document.getElementById('sort-select');
 const categorySelect = document.getElementById('category-select');
+const speakerSelect = document.getElementById('speaker-select');
 const pillsContainer = document.getElementById('pills-container');
 const statsCount = document.getElementById('stats-count');
 const lastSyncTime = document.getElementById('last-sync-time');
@@ -68,6 +69,7 @@ function setupEventListeners() {
   // Sort and Category Filters
   sortSelect.addEventListener('change', filterAndRender);
   categorySelect.addEventListener('change', filterAndRender);
+  speakerSelect.addEventListener('change', filterAndRender);
 
   // Sync Database Button
   syncBtn.addEventListener('click', syncDatabase);
@@ -99,6 +101,8 @@ async function loadData() {
       };
     });
     
+    populateSpeakerDropdown();
+    
     // Update last sync timestamp
     const lastModifiedHeader = response.headers.get('Last-Modified');
     if (lastModifiedHeader) {
@@ -114,6 +118,41 @@ async function loadData() {
   } catch (error) {
     renderEmptyState(true);
   }
+}
+
+// Populate speaker filter dropdown with top 50 speakers sorted alphabetically
+function populateSpeakerDropdown() {
+  const speakerSignups = {};
+  
+  lessons.forEach(item => {
+    const instructors = item.instructors || [];
+    instructors.forEach(inst => {
+      const name = inst.name;
+      if (name) {
+        speakerSignups[name] = (speakerSignups[name] || 0) + (item.signup_count || 0);
+      }
+    });
+  });
+
+  const topSpeakers = Object.entries(speakerSignups)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 50)
+    .map(entry => entry[0]);
+
+  topSpeakers.sort();
+
+  speakerSelect.replaceChildren();
+  const defaultOption = document.createElement('option');
+  defaultOption.value = 'all';
+  defaultOption.textContent = 'All Speakers';
+  speakerSelect.appendChild(defaultOption);
+
+  topSpeakers.forEach(name => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    speakerSelect.appendChild(option);
+  });
 }
 
 // Trigger Backend Server Update
@@ -298,6 +337,7 @@ function filterAndRender() {
 
   const queryTerms = activeQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
   const selectedType = categorySelect.value;
+  const selectedSpeaker = speakerSelect.value;
   const sortBy = sortSelect.value;
 
   // 1. Map scores
@@ -319,6 +359,14 @@ function filterAndRender() {
   // Filter by lesson type selector
   if (selectedType !== 'all') {
     filtered = filtered.filter(item => item.item_type === selectedType);
+  }
+
+  // Filter by speaker
+  if (selectedSpeaker && selectedSpeaker !== 'all') {
+    filtered = filtered.filter(item => {
+      const instructors = item.instructors || [];
+      return instructors.some(inst => inst.name === selectedSpeaker);
+    });
   }
 
   // 2. Sort results
